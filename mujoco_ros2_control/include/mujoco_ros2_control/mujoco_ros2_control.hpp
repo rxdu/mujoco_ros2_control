@@ -21,7 +21,9 @@ public:
   MujocoRos2Control(rclcpp::Node::SharedPtr & node, rclcpp::NodeOptions cm_node_option, mjModel* mujoco_model, mjData* mujoco_data);
   ~MujocoRos2Control();
   void init();
+  void pre_update();
   void update();
+  void update_with_step();
 
 private:
   void publish_sim_time(rclcpp::Time sim_time);
@@ -37,7 +39,10 @@ private:
   rclcpp::executors::MultiThreadedExecutor::SharedPtr cm_executor_;
   std::thread cm_thread_;
   bool stop_cm_thread_;
-  rclcpp::Duration control_period_;
+
+  rclcpp::Time sim_time_ros_;
+  rclcpp::Duration sim_period_{1,0};
+  rclcpp::Duration control_period_{1,0};
 
   rclcpp::Time last_update_sim_time_ros_;
   rclcpp::Publisher<rosgraph_msgs::msg::Clock>::SharedPtr clock_publisher_;

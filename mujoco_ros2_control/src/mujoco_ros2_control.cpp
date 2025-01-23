@@ -130,25 +130,38 @@ void MujocoRos2Control::init()
   }
 }
 
-void MujocoRos2Control::update()
-{
+void MujocoRos2Control::pre_update() {
   // Get the simulation time and period
   std::chrono::duration<double> sim_time(static_cast<double>(mj_data_->time));
 
   rclcpp::Time sim_time_ros(std::chrono::duration_cast<std::chrono::nanoseconds>(sim_time).count(), RCL_ROS_TIME);
-  rclcpp::Duration sim_period = sim_time_ros - last_update_sim_time_ros_;
+  sim_time_ros_ = sim_time_ros;
+  sim_period_ = sim_time_ros - last_update_sim_time_ros_;
 
   publish_sim_time(sim_time_ros);
+}
 
-  mj_step1(mj_model_, mj_data_);
-
-  if (sim_period >= control_period_) {
-    controller_manager_->read(sim_time_ros, sim_period);
-    controller_manager_->update(sim_time_ros, sim_period);
-    last_update_sim_time_ros_ = sim_time_ros;
+void MujocoRos2Control::update()
+{
+  if (sim_period_ >= control_period_) {
+    controller_manager_->read(sim_time_ros_, sim_period_);
+    controller_manager_->update(sim_time_ros_, sim_period_);
+    last_update_sim_time_ros_ = sim_time_ros_;
   }
   // use same time as for read and update call - this is how it is done in ros2_control_node
-  controller_manager_->write(sim_time_ros, sim_period);
+  controller_manager_->write(sim_time_ros_, sim_period_);
+}
+
+void MujocoRos2Control::update_with_step() {
+  mj_step1(mj_model_, mj_data_);
+
+  if (sim_period_ >= control_period_) {
+    controller_manager_->read(sim_time_ros_, sim_period_);
+    controller_manager_->update(sim_time_ros_, sim_period_);
+    last_update_sim_time_ros_ = sim_time_ros_;
+  }
+  // use same time as for read and update call - this is how it is done in ros2_control_node
+  controller_manager_->write(sim_time_ros_, sim_period_);
 
   mj_step2(mj_model_, mj_data_);
 }

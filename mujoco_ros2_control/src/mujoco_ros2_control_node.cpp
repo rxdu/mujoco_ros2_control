@@ -60,7 +60,9 @@ int main(int argc, const char** argv) {
     //  Otherwise add a cpu timer and exit this loop when it is time to render.
     mjtNum simstart = mujoco_data->time;
     while (mujoco_data->time - simstart < 1.0/60.0) {
-      control.update();
+      // control.update();
+      control.pre_update();
+      control.update_with_step();
     }
     rendering->update();
   }
