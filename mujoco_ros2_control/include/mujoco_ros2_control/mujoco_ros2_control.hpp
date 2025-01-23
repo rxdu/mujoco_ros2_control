@@ -38,15 +38,18 @@ namespace mujoco_ros2_control
 class MujocoRos2Control
 {
 public:
-  MujocoRos2Control(rclcpp::Node::SharedPtr &node, mjModel *mujoco_model, mjData *mujoco_data);
+  MujocoRos2Control(rclcpp::Node::SharedPtr &node, rclcpp::NodeOptions cm_node_option, mjModel *mujoco_model, mjData *mujoco_data);
   ~MujocoRos2Control();
   void init();
+  void pre_update();
   void update();
+  void update_with_step();
 
 private:
   void publish_sim_time(rclcpp::Time sim_time);
   std::string get_robot_description();
   rclcpp::Node::SharedPtr node_;
+  rclcpp::NodeOptions cm_node_option_;
   mjModel *mj_model_;
   mjData *mj_data_;
 
@@ -57,7 +60,10 @@ private:
   rclcpp::Executor::SharedPtr cm_executor_;
   std::thread cm_thread_;
   bool stop_cm_thread_;
-  rclcpp::Duration control_period_;
+
+  rclcpp::Time sim_time_ros_;
+  rclcpp::Duration sim_period_{1,0};
+  rclcpp::Duration control_period_{1,0};
 
   rclcpp::Time last_update_sim_time_ros_;
   rclcpp::Publisher<rosgraph_msgs::msg::Clock>::SharedPtr clock_publisher_;

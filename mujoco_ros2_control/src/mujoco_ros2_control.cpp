@@ -27,8 +27,9 @@
 namespace mujoco_ros2_control
 {
 MujocoRos2Control::MujocoRos2Control(
-  rclcpp::Node::SharedPtr &node, mjModel *mujoco_model, mjData *mujoco_data)
+  rclcpp::Node::SharedPtr &node, rclcpp::NodeOptions cm_node_option, mjModel *mujoco_model, mjData *mujoco_data)
     : node_(node),
+      cm_node_option_(cm_node_option),
       mj_model_(mujoco_model),
       mj_data_(mujoco_data),
       logger_(rclcpp::get_logger(node_->get_name() + std::string(".mujoco_ros2_control"))),
@@ -158,8 +159,11 @@ void MujocoRos2Control::init()
   // Create the controller manager
   RCLCPP_INFO(logger_, "Loading controller_manager");
   cm_executor_ = std::make_shared<rclcpp::executors::MultiThreadedExecutor>();
-  controller_manager_ = std::make_shared<controller_manager::ControllerManager>(
-    std::move(resource_manager), cm_executor_, "controller_manager", node_->get_namespace());
+  controller_manager_.reset(new controller_manager::ControllerManager(
+      std::move(resource_manager), cm_executor_,
+      "controller_manager", node_->get_namespace(), cm_node_option_));
+
+  cm_executor_->add_node(node_);
   cm_executor_->add_node(controller_manager_);
 
   if (!controller_manager_->has_parameter("update_rate"))
@@ -187,29 +191,39 @@ void MujocoRos2Control::init()
   cm_thread_ = std::thread(spin);
 }
 
-void MujocoRos2Control::update()
-{
+void MujocoRos2Control::pre_update() {
   // Get the simulation time and period
-  auto sim_time = mj_data_->time;
-  int sim_time_sec = static_cast<int>(sim_time);
-  int sim_time_nanosec = static_cast<int>((sim_time - sim_time_sec) * 1000000000);
+  std::chrono::duration<double> sim_time(static_cast<double>(mj_data_->time));
 
-  rclcpp::Time sim_time_ros(sim_time_sec, sim_time_nanosec, RCL_ROS_TIME);
-  rclcpp::Duration sim_period = sim_time_ros - last_update_sim_time_ros_;
+  rclcpp::Time sim_time_ros(std::chrono::duration_cast<std::chrono::nanoseconds>(sim_time).count(), RCL_ROS_TIME);
+  sim_time_ros_ = sim_time_ros;
+  sim_period_ = sim_time_ros - last_update_sim_time_ros_;
 
   publish_sim_time(sim_time_ros);
+}
 
+void MujocoRos2Control::update()
+{
+  if (sim_period_ >= control_period_) {
+    controller_manager_->read(sim_time_ros_, sim_period_);
+    controller_manager_->update(sim_time_ros_, sim_period_);
+    last_update_sim_time_ros_ = sim_time_ros_;
+  }
+  // use same time as for read and update call - this is how it is done in ros2_control_node
+  controller_manager_->write(sim_time_ros_, sim_period_);
+}
+
+void MujocoRos2Control::update_with_step() {
   mj_step1(mj_model_, mj_data_);
 
-  if (sim_period >= control_period_)
-  {
-    controller_manager_->read(sim_time_ros, sim_period);
-    controller_manager_->update(sim_time_ros, sim_period);
-    last_update_sim_time_ros_ = sim_time_ros;
+  if (sim_period_ >= control_period_) {
+    controller_manager_->read(sim_time_ros_, sim_period_);
+    controller_manager_->update(sim_time_ros_, sim_period_);
+    last_update_sim_time_ros_ = sim_time_ros_;
   }
 
   // use same time as for read and update call - this is how it is done in ros2_control_node
-  controller_manager_->write(sim_time_ros, sim_period);
+  controller_manager_->write(sim_time_ros_, sim_period_);
 
   mj_step2(mj_model_, mj_data_);
 }
