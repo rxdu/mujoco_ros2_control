@@ -65,7 +65,9 @@ target_include_directories(mujoco_system_plugins
     ${EIGEN3_INCLUDE_DIR})
 pluginlib_export_plugin_description_file(mujoco_ros2_control mujoco_system_plugins.xml)
 
-add_library(mujoco_ros2_control-system SHARED src/mujoco_ros2_control_plugin.cpp)
+add_library(mujoco_ros2_control-system SHARED
+    src/mujoco_ros2_control_plugin.cpp
+    src/mujoco_ros2_control.cpp)
 ament_target_dependencies(mujoco_ros2_control-system ${THIS_PACKAGE_DEPENDS})
 target_link_libraries(mujoco_ros2_control-system ${MUJOCO_LIB})
 target_include_directories(mujoco_ros2_control-system
@@ -74,9 +76,11 @@ target_include_directories(mujoco_ros2_control-system
     $<INSTALL_INTERFACE:include>
     ${MUJOCO_INCLUDE_DIR}
     ${EIGEN3_INCLUDE_DIR})
+pluginlib_export_plugin_description_file(mujoco_sim_ros2 mujoco_ros2_control_plugins.xml)
 
 install(TARGETS
-    mujoco_system_plugins
+    mujoco_system_plugins mujoco_ros2_control-system
+    EXPORT export_${PROJECT_NAME}
     ARCHIVE DESTINATION lib
     LIBRARY DESTINATION lib
     RUNTIME DESTINATION bin
