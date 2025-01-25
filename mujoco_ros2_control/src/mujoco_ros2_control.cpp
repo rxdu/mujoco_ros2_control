@@ -99,6 +99,7 @@ void MujocoRos2Control::init()
       std::move(resource_manager), cm_executor_,
       "controller_manager", node_->get_namespace(), cm_node_option_));
 
+  cm_executor_->add_node(node_);
   cm_executor_->add_node(controller_manager_);
 
   if (!controller_manager_->has_parameter("update_rate")) {
