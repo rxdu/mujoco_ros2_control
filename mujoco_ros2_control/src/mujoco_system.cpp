@@ -309,9 +309,24 @@ void MujocoSystem::register_sensors(const urdf::Model& urdf_model, const hardwar
     }
     const std::string type = sensor_info.parameters["type"];
     /// @TODO: May cause duplicate problem
-    if(type == "IMU") imu_idx.push_back(int(info_idx));
-    else if(type == "FTSensor") ft_idx.push_back(int(info_idx));
-    else if(type == "Touch")  touch_idx.push_back(int(info_idx));
+    if(type == "IMU")
+    {
+      imu_idx.push_back(int(info_idx));
+      RCLCPP_INFO(logger_, "IMU sensor found, name: %s, id: %ld",
+        sensor_info.name.c_str(), info_idx);
+    }
+    else if(type == "FTSensor")
+    {
+      ft_idx.push_back(int(info_idx));
+      RCLCPP_INFO(logger_, "FTSensor sensor found, name: %s, id: %ld",
+        sensor_info.name.c_str(), info_idx);
+    }
+    else if(type == "Touch")
+    {
+      touch_idx.push_back(int(info_idx));
+      RCLCPP_INFO(logger_, "Touch sensor found, name: %s, id: %ld",
+        sensor_info.name.c_str(), info_idx);
+    }
   }
   ft_sensor_data_.resize(ft_idx.size());
   imu_sensor_data_.resize(imu_idx.size());
@@ -325,7 +340,7 @@ void MujocoSystem::register_sensors(const urdf::Model& urdf_model, const hardwar
     int touch_id = mj_name2id(mj_model_, mjtObj::mjOBJ_SENSOR, touch_data.name.c_str());
     if(touch_id == -1)
     {
-      RCLCPP_ERROR_STREAM(logger_, "Failed to find sensor in mujoco model, sensor name: " << touch_data.name);
+      RCLCPP_ERROR_STREAM(logger_, "Failed to find touch sensor in mujoco model, sensor name: " << touch_data.name);
       continue;
     }
     touch_data.mj_sensor_index = mj_model_->sensor_adr[touch_id];
@@ -368,7 +383,7 @@ void MujocoSystem::register_sensors(const urdf::Model& urdf_model, const hardwar
 
   for (size_t sensor_idx = 0; sensor_idx < ft_idx.size(); ++sensor_idx)
   {
-    auto sensor = hardware_info.sensors.at(sensor_idx);
+    auto sensor = hardware_info.sensors[ft_idx[sensor_idx]];
 
     FTSensorData sensor_data;
     sensor_data.name = sensor.name;
@@ -380,7 +395,7 @@ void MujocoSystem::register_sensors(const urdf::Model& urdf_model, const hardwar
 
     if (force_sensor_id == -1 || torque_sensor_id == -1)
     {
-      RCLCPP_ERROR_STREAM(logger_, "Failed to find sensor in mujoco model, sensor name: " << sensor.name);
+      RCLCPP_ERROR_STREAM(logger_, "Failed to find FTSensor sensor in mujoco model, sensor name: " << sensor.name);
       continue;
     }
 
