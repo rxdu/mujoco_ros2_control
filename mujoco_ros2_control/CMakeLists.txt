@@ -1,6 +1,9 @@
 cmake_minimum_required(VERSION 3.5)
 project(mujoco_ros2_control)
 
+# Suppress OpenGL GLVND warning
+cmake_policy(SET CMP0072 NEW)
+
 # Default to C++14
 if(NOT CMAKE_CXX_STANDARD)
   set(CMAKE_CXX_STANDARD 14)
