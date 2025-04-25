@@ -23,23 +23,31 @@ void MujocoRos2ControlPlugin::Configure(
 void MujocoRos2ControlPlugin::Reset(mjModel *model, mjData *data)
 {
   // reset mujoco model and data
+  (void)model; // suppress unused parameter warning
+  (void)data;  // suppress unused parameter warning
 }
 
 void MujocoRos2ControlPlugin::PreUpdate(mjModel *model, mjData *data)
 {
   // pre-update logic
   control_->pre_update();
+  (void)model;  // suppress unused parameter warning
+  (void)data;   // suppress unused parameter warning
 }
 
 void MujocoRos2ControlPlugin::Update(mjModel *model, mjData *data)
 {
   // update logic
   control_->update();
+  (void)model;  // suppress unused parameter warning
+  (void)data;   // suppress unused parameter warning
 }
 
 void MujocoRos2ControlPlugin::PostUpdate(mjModel *model, mjData *data)
 {
   // post-update logic
+  (void)model; // suppress unused parameter warning
+  (void)data;  // suppress unused parameter warning
 }
 }  // namespace mujoco_ros2_control
 
