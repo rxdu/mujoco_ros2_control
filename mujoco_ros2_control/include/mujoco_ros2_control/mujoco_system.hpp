@@ -57,8 +57,8 @@ inline control_toolbox::Pid make_pid(
   antiwindup_strat.i_min = i_min;
   antiwindup_strat.legacy_antiwindup = enable_anti_windup;
   return control_toolbox::Pid(
-    p, i, d, std::numeric_limits<double>::infinity(),
-    -std::numeric_limits<double>::infinity(), antiwindup_strat);
+    p, i, d, std::numeric_limits<double>::infinity(), -std::numeric_limits<double>::infinity(),
+    antiwindup_strat);
 #else
   return control_toolbox::Pid(p, i, d, i_max, i_min, enable_anti_windup);
 #endif

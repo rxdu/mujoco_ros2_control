@@ -39,14 +39,14 @@ namespace mujoco_ros2_control
 class MJResourceManager : public hardware_interface::ResourceManager
 {
 public:
-  MJResourceManager(rclcpp::Node::SharedPtr & node, mjModel * mj_model, mjData * mj_data)
-  : hardware_interface::ResourceManager(
-      node->get_node_clock_interface(), node->get_node_logging_interface()),
-    mj_system_loader_("mujoco_ros2_control", "mujoco_ros2_control::MujocoSystemInterface"),
-    logger_(node->get_logger().get_child("MJResourceManager")),
-    clock_(node->get_clock()),
-    mj_model_(mj_model),
-    mj_data_(mj_data)
+  MJResourceManager(rclcpp::Node::SharedPtr &node, mjModel *mj_model, mjData *mj_data)
+      : hardware_interface::ResourceManager(
+          node->get_node_clock_interface(), node->get_node_logging_interface()),
+        mj_system_loader_("mujoco_ros2_control", "mujoco_ros2_control::MujocoSystemInterface"),
+        logger_(node->get_logger().get_child("MJResourceManager")),
+        clock_(node->get_clock()),
+        mj_model_(mj_model),
+        mj_data_(mj_data)
   {
   }
   MJResourceManager(const MJResourceManager &) = delete;
@@ -54,15 +54,15 @@ public:
   // Override from hardware_interface::ResourceManager. Called by the
   // controller_manager once the robot_description is available.
   bool load_and_initialize_components(
-    const std::string & urdf, unsigned int /* update_rate */) override
+    const std::string &urdf, unsigned int /* update_rate */) override
   {
     components_are_loaded_and_initialized_ = true;
 
     const auto hardware_info = hardware_interface::parse_control_resources_from_urdf(urdf);
 
-    for (const auto & individual_hardware_info : hardware_info)
+    for (const auto &individual_hardware_info : hardware_info)
     {
-      const std::string & hardware_type = individual_hardware_info.hardware_plugin_name;
+      const std::string &hardware_type = individual_hardware_info.hardware_plugin_name;
       RCLCPP_DEBUG(logger_, "Loading hardware interface %s ...", hardware_type.c_str());
 
       std::unique_ptr<MujocoSystemInterface> mj_system;
@@ -72,7 +72,7 @@ public:
         mj_system = std::unique_ptr<MujocoSystemInterface>(
           mj_system_loader_.createUnmanagedInstance(hardware_type));
       }
-      catch (pluginlib::PluginlibException & ex)
+      catch (pluginlib::PluginlibException &ex)
       {
         RCLCPP_ERROR_STREAM(logger_, "The plugin failed to load. Error: " << ex.what());
         continue;
@@ -101,13 +101,14 @@ private:
   pluginlib::ClassLoader<MujocoSystemInterface> mj_system_loader_;
   rclcpp::Logger logger_;
   rclcpp::Clock::SharedPtr clock_;
-  mjModel * mj_model_;
-  mjData * mj_data_;
+  mjModel *mj_model_;
+  mjData *mj_data_;
 };
 #endif  // MJ_ROS_DISTRO_JAZZY
 
 MujocoRos2Control::MujocoRos2Control(
-  rclcpp::Node::SharedPtr &node, rclcpp::NodeOptions cm_node_option, mjModel *mujoco_model, mjData *mujoco_data)
+  rclcpp::Node::SharedPtr &node, rclcpp::NodeOptions cm_node_option, mjModel *mujoco_model,
+  mjData *mujoco_data)
     : node_(node),
       cm_node_option_(cm_node_option),
       mj_model_(mujoco_model),
@@ -250,8 +251,8 @@ void MujocoRos2Control::init()
   RCLCPP_INFO(logger_, "Loading controller_manager");
   cm_executor_ = std::make_shared<rclcpp::executors::MultiThreadedExecutor>();
   controller_manager_.reset(new controller_manager::ControllerManager(
-      std::move(resource_manager), cm_executor_,
-      "controller_manager", node_->get_namespace(), cm_node_option_));
+    std::move(resource_manager), cm_executor_, "controller_manager", node_->get_namespace(),
+    cm_node_option_));
 
   cm_executor_->add_node(node_);
   cm_executor_->add_node(controller_manager_);
@@ -281,11 +282,13 @@ void MujocoRos2Control::init()
   cm_thread_ = std::thread(spin);
 }
 
-void MujocoRos2Control::pre_update() {
+void MujocoRos2Control::pre_update()
+{
   // Get the simulation time and period
   std::chrono::duration<double> sim_time(static_cast<double>(mj_data_->time));
 
-  rclcpp::Time sim_time_ros(std::chrono::duration_cast<std::chrono::nanoseconds>(sim_time).count(), RCL_ROS_TIME);
+  rclcpp::Time sim_time_ros(
+    std::chrono::duration_cast<std::chrono::nanoseconds>(sim_time).count(), RCL_ROS_TIME);
   sim_time_ros_ = sim_time_ros;
   sim_period_ = sim_time_ros - last_update_sim_time_ros_;
 
@@ -294,7 +297,8 @@ void MujocoRos2Control::pre_update() {
 
 void MujocoRos2Control::update()
 {
-  if (sim_period_ >= control_period_) {
+  if (sim_period_ >= control_period_)
+  {
     controller_manager_->read(sim_time_ros_, sim_period_);
     controller_manager_->update(sim_time_ros_, sim_period_);
     last_update_sim_time_ros_ = sim_time_ros_;
@@ -303,10 +307,12 @@ void MujocoRos2Control::update()
   controller_manager_->write(sim_time_ros_, sim_period_);
 }
 
-void MujocoRos2Control::update_with_step() {
+void MujocoRos2Control::update_with_step()
+{
   mj_step1(mj_model_, mj_data_);
 
-  if (sim_period_ >= control_period_) {
+  if (sim_period_ >= control_period_)
+  {
     controller_manager_->read(sim_time_ros_, sim_period_);
     controller_manager_->update(sim_time_ros_, sim_period_);
     last_update_sim_time_ros_ = sim_time_ros_;
