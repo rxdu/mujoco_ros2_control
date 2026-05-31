@@ -18,6 +18,8 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 // THE SOFTWARE.
 
+#include <mutex>
+
 #include "hardware_interface/component_parser.hpp"
 #include "hardware_interface/resource_manager.hpp"
 #include "hardware_interface/system_interface.hpp"
@@ -26,6 +28,75 @@
 
 namespace mujoco_ros2_control
 {
+#if defined(MJ_ROS_DISTRO_JAZZY)
+// On Jazzy, hardware_interface::ResourceManager has no default constructor and
+// the controller_manager loads hardware components by calling
+// load_and_initialize_components() from its robot_description callback. We
+// subclass ResourceManager to plug MuJoCo's system interface into that flow.
+class MJResourceManager : public hardware_interface::ResourceManager
+{
+public:
+  MJResourceManager(rclcpp::Node::SharedPtr & node, mjModel * mj_model, mjData * mj_data)
+  : hardware_interface::ResourceManager(
+      node->get_node_clock_interface(), node->get_node_logging_interface()),
+    mj_system_loader_("mujoco_ros2_control", "mujoco_ros2_control::MujocoSystemInterface"),
+    logger_(node->get_logger().get_child("MJResourceManager")),
+    mj_model_(mj_model),
+    mj_data_(mj_data)
+  {
+  }
+  MJResourceManager(const MJResourceManager &) = delete;
+
+  // Override from hardware_interface::ResourceManager. Called by the
+  // controller_manager once the robot_description is available.
+  bool load_and_initialize_components(
+    const std::string & urdf, unsigned int /* update_rate */) override
+  {
+    components_are_loaded_and_initialized_ = true;
+
+    const auto hardware_info = hardware_interface::parse_control_resources_from_urdf(urdf);
+
+    for (const auto & individual_hardware_info : hardware_info)
+    {
+      const std::string & hardware_type = individual_hardware_info.hardware_plugin_name;
+      RCLCPP_DEBUG(logger_, "Loading hardware interface %s ...", hardware_type.c_str());
+
+      std::unique_ptr<MujocoSystemInterface> mj_system;
+      std::scoped_lock guard(resource_interfaces_lock_, claimed_command_interfaces_lock_);
+      try
+      {
+        mj_system = std::unique_ptr<MujocoSystemInterface>(
+          mj_system_loader_.createUnmanagedInstance(hardware_type));
+      }
+      catch (pluginlib::PluginlibException & ex)
+      {
+        RCLCPP_ERROR_STREAM(logger_, "The plugin failed to load. Error: " << ex.what());
+        continue;
+      }
+
+      urdf::Model urdf_model;
+      urdf_model.initString(urdf);
+      if (!mj_system->init_sim(mj_model_, mj_data_, urdf_model, individual_hardware_info))
+      {
+        RCLCPP_FATAL(logger_, "Could not initialize robot simulation interface");
+        components_are_loaded_and_initialized_ = false;
+        break;
+      }
+
+      import_component(std::move(mj_system), individual_hardware_info);
+    }
+
+    return components_are_loaded_and_initialized_;
+  }
+
+private:
+  pluginlib::ClassLoader<MujocoSystemInterface> mj_system_loader_;
+  rclcpp::Logger logger_;
+  mjModel * mj_model_;
+  mjData * mj_data_;
+};
+#endif  // MJ_ROS_DISTRO_JAZZY
+
 MujocoRos2Control::MujocoRos2Control(
   rclcpp::Node::SharedPtr &node, rclcpp::NodeOptions cm_node_option, mjModel *mujoco_model, mjData *mujoco_data)
     : node_(node),
@@ -88,6 +159,15 @@ void MujocoRos2Control::init()
 {
   clock_publisher_ = node_->create_publisher<rosgraph_msgs::msg::Clock>("/clock", 10);
 
+#if defined(MJ_ROS_DISTRO_JAZZY)
+  // Jazzy: hand the controller_manager an MJResourceManager; it loads the
+  // MuJoCo system components via load_and_initialize_components() once the
+  // robot_description becomes available.
+  std::unique_ptr<hardware_interface::ResourceManager> resource_manager =
+    std::make_unique<MJResourceManager>(node_, mj_model_, mj_data_);
+#else
+  // Humble: fetch the robot_description, then load and activate the MuJoCo
+  // system components manually before creating the controller_manager.
   std::string urdf_string = this->get_robot_description();
 
   // setup actuators and mechanism control node.
@@ -155,6 +235,7 @@ void MujocoRos2Control::init()
       hardware_interface::lifecycle_state_names::ACTIVE);
     resource_manager->set_component_state(hardware.name, state);
   }
+#endif  // MJ_ROS_DISTRO_JAZZY
 
   // Create the controller manager
   RCLCPP_INFO(logger_, "Loading controller_manager");
