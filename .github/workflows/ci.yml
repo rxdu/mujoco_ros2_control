@@ -6,9 +6,7 @@ on:
   push:
     branches:
       - main
-
-env:
-  ROS_DISTRO: humble
+      - ros2
 
 jobs:
   pre-commit:
@@ -21,29 +19,68 @@ jobs:
     - name: Install dependencies
       run: |
         sudo apt-get update
-        sudo rosdep update --rosdistro ${{ env.ROS_DISTRO }}
-        sudo rosdep install --from-paths . --ignore-src -y -t test --rosdistro ${{ env.ROS_DISTRO }}
+        sudo rosdep update --rosdistro humble
+        sudo rosdep install --from-paths . --ignore-src -y -t test --rosdistro humble
     - name: Run pre-commit
       run: |
         pip3 install pre-commit
-        source /opt/ros/${{ env.ROS_DISTRO }}/setup.bash
+        source /opt/ros/humble/setup.bash
         pre-commit run --all-files
 
   build_and_test:
     needs: pre-commit
-    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - ros_distro: humble
+            os: ubuntu-22.04
+          - ros_distro: jazzy
+            os: ubuntu-24.04
+    runs-on: ${{ matrix.os }}
+    env:
+      MUJOCO_VERSION: "3.2.7"
     steps:
-    - name: Checkout code from current branch
+    - name: Checkout code into workspace
       uses: actions/checkout@v5
-    - name: Set up Docker Buildx
-      uses: docker/setup-buildx-action@v3
-    - name: Build in Docker container
-      uses: docker/build-push-action@v6
       with:
-        context: .
-        file: docker/Dockerfile
-        push: false
-        load: true
-        tags: mujoco_ros2_control:latest
-    - name: Test in Docker container
-      run: docker run --entrypoint "/bin/bash" --rm mujoco_ros2_control:latest -c "colcon test && colcon test-result --verbose"
+        path: src/mujoco_ros2_control
+
+    - name: Install MuJoCo (binary release)
+      run: |
+        MJ_PARENT="${HOME}/mujoco"
+        mkdir -p "${MJ_PARENT}"
+        wget -q "https://github.com/google-deepmind/mujoco/releases/download/${MUJOCO_VERSION}/mujoco-${MUJOCO_VERSION}-linux-x86_64.tar.gz"
+        tar -xzf "mujoco-${MUJOCO_VERSION}-linux-x86_64.tar.gz" -C "${MJ_PARENT}"
+        echo "MUJOCO_DIR=${MJ_PARENT}/mujoco-${MUJOCO_VERSION}" >> "${GITHUB_ENV}"
+
+    - name: Setup ROS ${{ matrix.ros_distro }}
+      uses: ros-tooling/setup-ros@v0.7
+      with:
+        required-ros-distributions: ${{ matrix.ros_distro }}
+
+    - name: Import sibling source dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y python3-vcstool libglfw3-dev
+        pip3 install xacro
+        vcs import src < src/mujoco_ros2_control/mujoco_ros2_control.repos
+
+    - name: Install ROS dependencies
+      run: |
+        sudo rosdep update --rosdistro ${{ matrix.ros_distro }}
+        # mujoco is provided as a binary release (MUJOCO_DIR), not via rosdep.
+        sudo rosdep install --from-paths src --ignore-src -y \
+          --rosdistro ${{ matrix.ros_distro }} --skip-keys mujoco
+
+    - name: Build
+      run: |
+        source /opt/ros/${{ matrix.ros_distro }}/setup.bash
+        colcon build --cmake-args -DCMAKE_BUILD_TYPE=RelWithDebInfo -DBUILD_TESTING=ON
+
+    - name: Test
+      run: |
+        source /opt/ros/${{ matrix.ros_distro }}/setup.bash
+        source install/setup.bash
+        colcon test --packages-select mujoco_ros2_control mujoco_ros2_control_demos
+        colcon test-result --verbose

@@ -1,0 +1,9 @@
+# Sibling source dependencies that are not available via rosdep.
+# Used by CI (and locally with `vcs import src < mujoco_ros2_control.repos`).
+# mujoco itself is installed as a binary release (see CI / docker/Dockerfile),
+# so it is intentionally not listed here.
+repositories:
+  mujoco_sim_ros2:
+    type: git
+    url: https://github.com/rxdu/mujoco_sim_ros2.git
+    version: main
