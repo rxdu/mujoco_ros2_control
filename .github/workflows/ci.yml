@@ -38,21 +38,11 @@ jobs:
           - ros_distro: jazzy
             os: ubuntu-24.04
     runs-on: ${{ matrix.os }}
-    env:
-      MUJOCO_VERSION: "3.2.7"
     steps:
     - name: Checkout code into workspace
       uses: actions/checkout@v5
       with:
         path: src/mujoco_ros2_control
-
-    - name: Install MuJoCo (binary release)
-      run: |
-        MJ_PARENT="${HOME}/mujoco"
-        mkdir -p "${MJ_PARENT}"
-        wget -q "https://github.com/google-deepmind/mujoco/releases/download/${MUJOCO_VERSION}/mujoco-${MUJOCO_VERSION}-linux-x86_64.tar.gz"
-        tar -xzf "mujoco-${MUJOCO_VERSION}-linux-x86_64.tar.gz" -C "${MJ_PARENT}"
-        echo "MUJOCO_DIR=${MJ_PARENT}/mujoco-${MUJOCO_VERSION}" >> "${GITHUB_ENV}"
 
     - name: Setup ROS ${{ matrix.ros_distro }}
       uses: ros-tooling/setup-ros@v0.7
@@ -69,7 +59,7 @@ jobs:
     - name: Install ROS dependencies
       run: |
         sudo rosdep update --rosdistro ${{ matrix.ros_distro }}
-        # mujoco is provided as a binary release (MUJOCO_DIR) and glfw3 via the
+        # mujoco is built from source (see .repos) and glfw3 comes from the
         # libglfw3-dev apt package above; neither is a resolvable rosdep key.
         sudo rosdep install --from-paths src --ignore-src -y \
           --rosdistro ${{ matrix.ros_distro }} --skip-keys "mujoco glfw3"
@@ -77,7 +67,10 @@ jobs:
     - name: Build
       run: |
         source /opt/ros/${{ matrix.ros_distro }}/setup.bash
-        colcon build --cmake-args -DCMAKE_BUILD_TYPE=RelWithDebInfo -DBUILD_TESTING=ON
+        # MUJOCO_BUILD_TESTS=OFF keeps the mujoco source build lean (skips
+        # fetching googletest/benchmark); it only affects the mujoco package.
+        colcon build --cmake-args \
+          -DCMAKE_BUILD_TYPE=RelWithDebInfo -DBUILD_TESTING=ON -DMUJOCO_BUILD_TESTS=OFF
 
     - name: Test
       run: |

@@ -1,8 +1,14 @@
-# Sibling source dependencies that are not available via rosdep.
+# Source dependencies that are not available via rosdep.
 # Used by CI (and locally with `vcs import src < mujoco_ros2_control.repos`).
-# mujoco itself is installed as a binary release (see CI / docker/Dockerfile),
-# so it is intentionally not listed here.
+#
+# mujoco is built from source so that `find_package(mujoco)` works: the binary
+# release does not ship a CMake package config, and mujoco_sim_ros2 requires it.
+# Keep the mujoco version in sync with mujoco_sim_ros2 (currently 3.9.0).
 repositories:
+  mujoco:
+    type: git
+    url: https://github.com/google-deepmind/mujoco.git
+    version: "3.9.0"
   mujoco_sim_ros2:
     type: git
     url: https://github.com/rxdu/mujoco_sim_ros2.git
