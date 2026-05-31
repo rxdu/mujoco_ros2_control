@@ -22,6 +22,7 @@
 #define MUJOCO_ROS2_CONTROL__MUJOCO_SYSTEM_HPP_
 
 #include <Eigen/Dense>
+#include <limits>
 #include <string>
 #include <vector>
 
@@ -37,6 +38,41 @@ constexpr char PARAM_KI[]{"_ki"};
 constexpr char PARAM_KD[]{"_kd"};
 constexpr char PARAM_I_MAX[]{"_i_max"};
 constexpr char PARAM_I_MIN[]{"_i_min"};
+
+// control_toolbox::Pid's API diverges between ROS distros: Jazzy deprecated the
+// (p, i, d, i_max, i_min, antiwindup) constructor and computeCommand() in favor
+// of an AntiWindupStrategy-based constructor and compute_command(). These two
+// helpers concentrate the distro guard in one place so the rest of the code is
+// distro-agnostic. On Jazzy the integral clamps map to the LEGACY anti-windup
+// strategy (which preserves the previous integral-limiting behavior) and the
+// output is left unbounded, matching the old constructor that had no output
+// clamp.
+inline control_toolbox::Pid make_pid(
+  double p, double i, double d, double i_max, double i_min, bool enable_anti_windup)
+{
+#if defined(MJ_ROS_DISTRO_JAZZY)
+  control_toolbox::AntiWindupStrategy antiwindup_strat;
+  antiwindup_strat.type = control_toolbox::AntiWindupStrategy::LEGACY;
+  antiwindup_strat.i_max = i_max;
+  antiwindup_strat.i_min = i_min;
+  antiwindup_strat.legacy_antiwindup = enable_anti_windup;
+  return control_toolbox::Pid(
+    p, i, d, std::numeric_limits<double>::infinity(),
+    -std::numeric_limits<double>::infinity(), antiwindup_strat);
+#else
+  return control_toolbox::Pid(p, i, d, i_max, i_min, enable_anti_windup);
+#endif
+}
+
+inline double compute_pid_command(
+  control_toolbox::Pid &pid, double error, const rclcpp::Duration &period)
+{
+#if defined(MJ_ROS_DISTRO_JAZZY)
+  return pid.compute_command(error, period.nanoseconds());
+#else
+  return pid.computeCommand(error, period.nanoseconds());
+#endif
+}
 
 class MujocoSystem : public MujocoSystemInterface
 {
@@ -69,8 +105,12 @@ public:
     double max_velocity_command;
     double min_effort_command;
     double max_effort_command;
-    control_toolbox::Pid position_pid;
-    control_toolbox::Pid velocity_pid;
+    control_toolbox::Pid position_pid = make_pid(
+      0.0, 0.0, 0.0, std::numeric_limits<double>::infinity(),
+      -std::numeric_limits<double>::infinity(), false);
+    control_toolbox::Pid velocity_pid = make_pid(
+      0.0, 0.0, 0.0, std::numeric_limits<double>::infinity(),
+      -std::numeric_limits<double>::infinity(), false);
     bool is_position_control_enabled{false};
     bool is_velocity_control_enabled{false};
     bool is_effort_control_enabled{false};

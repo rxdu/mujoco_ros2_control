@@ -23,6 +23,9 @@
 #include "hardware_interface/component_parser.hpp"
 #include "hardware_interface/resource_manager.hpp"
 #include "hardware_interface/system_interface.hpp"
+#if defined(MJ_ROS_DISTRO_JAZZY)
+#include "hardware_interface/types/hardware_component_params.hpp"
+#endif
 
 #include "mujoco_ros2_control/mujoco_ros2_control.hpp"
 
@@ -41,6 +44,7 @@ public:
       node->get_node_clock_interface(), node->get_node_logging_interface()),
     mj_system_loader_("mujoco_ros2_control", "mujoco_ros2_control::MujocoSystemInterface"),
     logger_(node->get_logger().get_child("MJResourceManager")),
+    clock_(node->get_clock()),
     mj_model_(mj_model),
     mj_data_(mj_data)
   {
@@ -83,7 +87,11 @@ public:
         break;
       }
 
-      import_component(std::move(mj_system), individual_hardware_info);
+      hardware_interface::HardwareComponentParams params;
+      params.hardware_info = individual_hardware_info;
+      params.logger = logger_;
+      params.clock = clock_;
+      import_component(std::move(mj_system), params);
     }
 
     return components_are_loaded_and_initialized_;
@@ -92,6 +100,7 @@ public:
 private:
   pluginlib::ClassLoader<MujocoSystemInterface> mj_system_loader_;
   rclcpp::Logger logger_;
+  rclcpp::Clock::SharedPtr clock_;
   mjModel * mj_model_;
   mjData * mj_data_;
 };
