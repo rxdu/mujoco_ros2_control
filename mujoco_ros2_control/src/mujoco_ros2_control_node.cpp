@@ -40,9 +40,9 @@ int main(int argc, const char **argv)
   // get the ros arg, mainly for getting --param-file for cm
   rclcpp::NodeOptions cm_node_options = controller_manager::get_cm_node_options();
   std::vector<std::string> node_arguments = cm_node_options.arguments();
-  for(int i = 1; i < argc; ++i)
+  for (int i = 1; i < argc; ++i)
   {
-    if(node_arguments.empty() && std::string(argv[i]) != "--ros-args") continue;
+    if (node_arguments.empty() && std::string(argv[i]) != "--ros-args") continue;
     node_arguments.emplace_back(argv[i]);
   }
   cm_node_options.arguments(node_arguments);
@@ -72,7 +72,8 @@ int main(int argc, const char **argv)
   mujoco_data = mj_makeData(mujoco_model);
 
   // initialize mujoco control
-  auto mujoco_control = mujoco_ros2_control::MujocoRos2Control(node, cm_node_options, mujoco_model, mujoco_data);
+  auto mujoco_control =
+    mujoco_ros2_control::MujocoRos2Control(node, cm_node_options, mujoco_model, mujoco_data);
 
   mujoco_control.init();
   RCLCPP_INFO_STREAM(

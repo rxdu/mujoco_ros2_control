@@ -5,22 +5,22 @@ project(mujoco_ros2_control)
 cmake_policy(SET CMP0072 NEW)
 
 # Default to C++17
-if (NOT CMAKE_CXX_STANDARD)
+if(NOT CMAKE_CXX_STANDARD)
   set(CMAKE_CXX_STANDARD 17)
   set(CMAKE_CXX_STANDARD_REQUIRED ON)
-endif ()
+endif()
 
-if (CMAKE_COMPILER_IS_GNUCXX OR CMAKE_CXX_COMPILER_ID MATCHES "Clang")
+if(CMAKE_COMPILER_IS_GNUCXX OR CMAKE_CXX_COMPILER_ID MATCHES "Clang")
   add_compile_options(-Wall -Wextra -Wpedantic)
-endif ()
+endif()
 
 # The controller_manager / ResourceManager integration API differs between ROS
 # distros (Jazzy removed ResourceManager's default constructor and loads
 # components via load_and_initialize_components()). Expose the active distro to
 # the C++ sources so a single branch can build on both Humble and Jazzy.
-if (DEFINED ENV{ROS_DISTRO} AND "$ENV{ROS_DISTRO}" STREQUAL "jazzy")
+if(DEFINED ENV{ROS_DISTRO} AND "$ENV{ROS_DISTRO}" STREQUAL "jazzy")
   add_compile_definitions(MJ_ROS_DISTRO_JAZZY)
-endif ()
+endif()
 
 # find dependencies
 find_package(ament_cmake REQUIRED)
