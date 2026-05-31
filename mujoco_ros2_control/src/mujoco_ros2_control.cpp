@@ -39,10 +39,13 @@ namespace mujoco_ros2_control
 class MJResourceManager : public hardware_interface::ResourceManager
 {
 public:
-  MJResourceManager(rclcpp::Node::SharedPtr &node, mjModel *mj_model, mjData *mj_data)
+  MJResourceManager(
+    rclcpp::Node::SharedPtr &node,
+    std::shared_ptr<pluginlib::ClassLoader<MujocoSystemInterface>> system_loader, mjModel *mj_model,
+    mjData *mj_data)
       : hardware_interface::ResourceManager(
           node->get_node_clock_interface(), node->get_node_logging_interface()),
-        mj_system_loader_("mujoco_ros2_control", "mujoco_ros2_control::MujocoSystemInterface"),
+        mj_system_loader_(std::move(system_loader)),
         logger_(node->get_logger().get_child("MJResourceManager")),
         clock_(node->get_clock()),
         mj_model_(mj_model),
@@ -70,7 +73,7 @@ public:
       try
       {
         mj_system = std::unique_ptr<MujocoSystemInterface>(
-          mj_system_loader_.createUnmanagedInstance(hardware_type));
+          mj_system_loader_->createUnmanagedInstance(hardware_type));
       }
       catch (pluginlib::PluginlibException &ex)
       {
@@ -98,7 +101,12 @@ public:
   }
 
 private:
-  pluginlib::ClassLoader<MujocoSystemInterface> mj_system_loader_;
+  // Shared with MujocoRos2Control::robot_hw_sim_loader_ so the loader outlives
+  // the hardware components it creates (the base ResourceManager destroys those
+  // components after this subclass's members, including this loader, are gone;
+  // sharing ownership keeps the loader alive until MujocoRos2Control is torn
+  // down, avoiding a class_loader unload-while-instances-exist corruption).
+  std::shared_ptr<pluginlib::ClassLoader<MujocoSystemInterface>> mj_system_loader_;
   rclcpp::Logger logger_;
   rclcpp::Clock::SharedPtr clock_;
   mjModel *mj_model_;
@@ -121,11 +129,20 @@ MujocoRos2Control::MujocoRos2Control(
 
 MujocoRos2Control::~MujocoRos2Control()
 {
+  // Stop the controller-manager spin thread first: signal it, then cancel the
+  // executor so a blocking spin_once() returns, then join before destroying
+  // anything it might touch.
   stop_cm_thread_ = true;
-  cm_executor_->remove_node(controller_manager_);
-  cm_executor_->cancel();
-
+  if (cm_executor_) cm_executor_->cancel();
   if (cm_thread_.joinable()) cm_thread_.join();
+
+  if (cm_executor_ && controller_manager_) cm_executor_->remove_node(controller_manager_);
+  if (cm_executor_ && node_) cm_executor_->remove_node(node_);
+
+  // Release the controller manager (and the hardware components its resource
+  // manager owns) while robot_hw_sim_loader_ is still alive, so the plugin
+  // instances are destroyed before the class loader that created them.
+  controller_manager_.reset();
 }
 
 std::string MujocoRos2Control::get_robot_description()
@@ -172,9 +189,13 @@ void MujocoRos2Control::init()
 #if defined(MJ_ROS_DISTRO_JAZZY)
   // Jazzy: hand the controller_manager an MJResourceManager; it loads the
   // MuJoCo system components via load_and_initialize_components() once the
-  // robot_description becomes available.
+  // robot_description becomes available. The plugin loader is owned by this
+  // class (robot_hw_sim_loader_, declared before controller_manager_) and shared
+  // with the resource manager so it outlives the components it creates.
+  robot_hw_sim_loader_ = std::make_shared<pluginlib::ClassLoader<MujocoSystemInterface>>(
+    "mujoco_ros2_control", "mujoco_ros2_control::MujocoSystemInterface");
   std::unique_ptr<hardware_interface::ResourceManager> resource_manager =
-    std::make_unique<MJResourceManager>(node_, mj_model_, mj_data_);
+    std::make_unique<MJResourceManager>(node_, robot_hw_sim_loader_, mj_model_, mj_data_);
 #else
   // Humble: fetch the robot_description, then load and activate the MuJoCo
   // system components manually before creating the controller_manager.

@@ -21,6 +21,7 @@
 #ifndef MUJOCO_ROS2_CONTROL__MUJOCO_ROS2_CONTROL_HPP_
 #define MUJOCO_ROS2_CONTROL__MUJOCO_ROS2_CONTROL_HPP_
 
+#include <atomic>
 #include <memory>
 #include <string>
 
@@ -61,7 +62,7 @@ private:
   std::shared_ptr<controller_manager::ControllerManager> controller_manager_;
   rclcpp::Executor::SharedPtr cm_executor_;
   std::thread cm_thread_;
-  bool stop_cm_thread_;
+  std::atomic<bool> stop_cm_thread_{false};
 
   rclcpp::Time sim_time_ros_;
   rclcpp::Duration sim_period_{1, 0};
