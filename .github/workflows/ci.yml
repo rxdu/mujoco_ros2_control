@@ -52,7 +52,9 @@ jobs:
     - name: Import sibling source dependencies
       run: |
         sudo apt-get update
-        sudo apt-get install -y python3-vcstool libglfw3-dev
+        # libglfw3-dev / libtinyxml2-dev provide the CMake configs that
+        # mujoco_sim_ros2's find_package(glfw3)/find_package(tinyxml2) need.
+        sudo apt-get install -y python3-vcstool libglfw3-dev libtinyxml2-dev
         pip3 install xacro
         vcs import src < src/mujoco_ros2_control/mujoco_ros2_control.repos
 
