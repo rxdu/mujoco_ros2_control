@@ -69,9 +69,10 @@ jobs:
     - name: Install ROS dependencies
       run: |
         sudo rosdep update --rosdistro ${{ matrix.ros_distro }}
-        # mujoco is provided as a binary release (MUJOCO_DIR), not via rosdep.
+        # mujoco is provided as a binary release (MUJOCO_DIR) and glfw3 via the
+        # libglfw3-dev apt package above; neither is a resolvable rosdep key.
         sudo rosdep install --from-paths src --ignore-src -y \
-          --rosdistro ${{ matrix.ros_distro }} --skip-keys mujoco
+          --rosdistro ${{ matrix.ros_distro }} --skip-keys "mujoco glfw3"
 
     - name: Build
       run: |
