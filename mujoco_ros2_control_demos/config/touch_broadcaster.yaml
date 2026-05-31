@@ -1,0 +1,10 @@
+controller_manager:
+  ros__parameters:
+    update_rate: 100  # Hz
+
+    # There is no standard broadcaster for a single scalar state interface, so
+    # the joint_state_broadcaster is loaded to exercise the controller manager.
+    # The touch reading is exposed as the "contact_touch/force" state interface
+    # and can be inspected with:  ros2 control list_hardware_interfaces
+    joint_state_broadcaster:
+      type: joint_state_broadcaster/JointStateBroadcaster

@@ -1,0 +1,28 @@
+<mujoco>
+	<option gravity="0 0 -9.81">
+		<flag contact="enable" />
+	</option>
+	<worldbody>
+        <light diffuse=".5 .5 .5" pos="0 0 5" dir="0 0 -1" />
+		<geom type="plane" size="20 20 0.1" rgba="1 1 1 1" />
+
+        <!-- Fixed pedestal carrying a touch sensing site on its top face -->
+        <body name="pedestal" pos="0 0 0.3" euler="0 0 0">
+            <geom type="cylinder" size="0.25 0.3" rgba="0 .8 0 1" />
+            <inertial pos="0 0 0" mass="10" diaginertia="1.0 1.0 1.0" />
+            <!-- The touch sensor sums normal contact forces inside this site volume.
+                 The site straddles the pedestal top (world z = 0.6). -->
+            <site name="contact_touch" type="box" size="0.26 0.26 0.02" pos="0 0 0.3" rgba="0 0 1 0.3" />
+        </body>
+
+        <!-- Weight that settles onto the pedestal, loading the touch site -->
+        <body name="weight" pos="0 0 0.75" euler="0 0 0">
+            <freejoint name="world_to_weight" />
+            <geom type="box" size="0.2 0.2 0.1" rgba=".8 0 0 1" />
+            <inertial pos="0 0 0" mass="5" diaginertia="0.1 0.1 0.1" />
+        </body>
+	</worldbody>
+    <sensor>
+        <touch name="contact_touch" site="contact_touch" />
+    </sensor>
+</mujoco>

@@ -79,6 +79,12 @@ hardware_interface::return_type MujocoSystem::read(
     data.torque.data.z() = -mj_data_->sensordata[data.torque.mj_sensor_index + 2];
   }
 
+  // Touch Sensor data (scalar normal force from a MuJoCo "touch" sensor)
+  for (auto &data : touch_sensor_data_)
+  {
+    data.data = mj_data_->sensordata[data.mj_sensor_index];
+  }
+
   return hardware_interface::return_type::OK;
 }
 
@@ -483,6 +489,34 @@ void MujocoSystem::register_sensors(
         {
           state_interfaces_.emplace_back(
             sensor.name, state_if.name, &last_sensor_data.linear_acceleration.data.z());
+        }
+      }
+    }
+
+    else if (sensor.name.find("_touch") != std::string::npos)
+    {
+      SensorData<double> sensor_data;
+      sensor_data.name = sensor.name;
+
+      int touch_sensor_id = mj_name2id(mj_model_, mjOBJ_SENSOR, sensor.name.c_str());
+
+      if (touch_sensor_id == -1)
+      {
+        RCLCPP_ERROR_STREAM(
+          logger_, "Failed to find touch sensor in mujoco model, sensor name: " << sensor.name);
+        continue;
+      }
+
+      sensor_data.mj_sensor_index = mj_model_->sensor_adr[touch_sensor_id];
+
+      touch_sensor_data_.push_back(sensor_data);
+      auto &last_sensor_data = touch_sensor_data_.back();
+
+      for (const auto &state_if : sensor.state_interfaces)
+      {
+        if (state_if.name == "force")
+        {
+          state_interfaces_.emplace_back(sensor.name, state_if.name, &last_sensor_data.data);
         }
       }
     }

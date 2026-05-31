@@ -1,0 +1,64 @@
+<?xml version="1.0" ?>
+<robot name="touch_demo">
+  <link name="world"/>
+
+  <link name="pedestal">
+    <visual>
+      <geometry>
+        <cylinder radius="0.25" length="0.6"/>
+      </geometry>
+      <origin xyz="0 0 0"/>
+      <material name="green">
+        <color rgba="0 .8 0 1"/>
+      </material>
+    </visual>
+    <inertial>
+      <mass value="10"/>
+      <inertia ixx="1.0" ixy="0.0" ixz="0.0" iyy="1.0" iyz="0.0" izz="1.0"/>
+    </inertial>
+  </link>
+
+  <link name="weight">
+    <visual>
+      <geometry>
+        <box size="0.4 0.4 0.2"/>
+      </geometry>
+      <origin xyz="0 0 0"/>
+      <material name="red">
+        <color rgba=".8 0 0 1"/>
+      </material>
+    </visual>
+    <inertial>
+      <mass value="5"/>
+      <inertia ixx="0.1" ixy="0.0" ixz="0.0" iyy="0.1" iyz="0.0" izz="0.1"/>
+    </inertial>
+  </link>
+
+  <joint name="world_to_pedestal" type="fixed">
+    <origin rpy="0 0 0" xyz="0 0 0.3"/>
+    <parent link="world"/>
+    <child link="pedestal"/>
+  </joint>
+
+  <joint name="world_to_weight" type="floating">
+    <origin xyz="0.0 0.0 0.75"/>
+    <parent link="world"/>
+    <child link="weight"/>
+    <limit effort="1000.0" lower="-2.5" upper="2.5" velocity="30"/>
+    <dynamics damping="1.0" friction="0.0"/>
+  </joint>
+
+  <ros2_control name="MujocoSystem" type="system">
+    <hardware>
+      <plugin>mujoco_ros2_control/MujocoSystem</plugin>
+    </hardware>
+
+    <!-- Touch sensor: name must end in "_touch" so MujocoSystem registers it.
+         The MuJoCo <touch> sensor of the same name reports a single scalar
+         normal force, exposed here as the "force" state interface. -->
+    <sensor name="contact_touch">
+      <state_interface name="force"/>
+      <param name="frame_id">pedestal</param>
+    </sensor>
+  </ros2_control>
+</robot>
